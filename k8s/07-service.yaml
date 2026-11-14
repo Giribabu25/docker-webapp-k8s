@@ -30,7 +30,7 @@ metadata:
   namespace: vprofile
   labels: {app: vprofile-app}
 spec:
-  type: LoadBalancer
+  type: ClusterIP
   selector: {app: vprofile-app}
   ports:
     - {name: http, port: 80, targetPort: http}
