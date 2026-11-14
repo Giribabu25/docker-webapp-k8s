@@ -1,0 +1,64 @@
+pipeline {
+    agent any
+    tools {
+        maven 'mymaven'
+    }
+    stages {
+        stage('Code') {
+            steps {
+                git branch: 'main', url: 'https://github.com/Giribabu25/docker-webapp-k8s.git'
+            }
+        }
+        stage('Build'){
+            steps{
+                sh "mvn clean install"
+            }
+        }
+        stage('CQA'){
+            steps{
+                withSonarQubeEnv('mysonar') {
+                        sh "mvn clean verify org.sonarsource.scanner.maven:sonar-maven-plugin:sonar -Dsonar.projectKey=Myproject"
+                }
+            }
+        }
+        stage('QualityGates'){
+            steps{
+                    waitForQualityGate abortPipeline: true, credentialsId: 'sonar-token'
+            }
+        }
+        stage('Artifact'){
+            steps{
+                echo "Add artifact here"
+            }
+        }
+        stage('Image'){
+            steps{
+                sh "docker build -t appimage ."
+                sh "docker build -t dbimage Docker-db"
+            }
+        }
+        stage('ScanImage'){
+            steps{
+                sh "trivy image appimage >> app-image-report.txt"
+                sh "trivy image dbimage >> db-image-report.txt"
+            }
+        }
+        stage('Registry'){
+            steps{
+                script{
+                    withDockerRegistry(credentialsId: 'dockerhub-cred') {
+                        sh "docker tag appimage giribabub/website:app"
+                        sh "docker tag dbimage giribabub/website:db"
+                        sh "docker push giribabub/website:app"
+                        sh "docker push giribabub/website:db"
+                    }
+                }
+            }
+        }
+        stage("Compose"){
+            steps{
+                sh "docker-compose up -d"
+            }
+        }
+    }
+}
